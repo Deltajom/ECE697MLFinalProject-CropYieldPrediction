@@ -5,5 +5,5 @@ def test_version():
 
 def test_CUDA():
     if(torch.cuda.is_available()):
-        return "Success! CUDA acceleration enabled"
-    return "Fail! CUDA acceleration NOT available"
+        return 1, "Success! CUDA acceleration enabled"
+    return 0, "Fail! CUDA acceleration NOT available"

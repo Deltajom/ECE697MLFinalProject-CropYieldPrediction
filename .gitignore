@@ -1,6 +1,9 @@
-lib/
+[Ll]ib/
 lib64/*
-include/
+[Ss]cripts/
+__pycache__/
+[Ss]hare/
+[Ii]nclude/
 bin/
 pyvenv.cfg
 
