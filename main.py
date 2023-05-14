@@ -4,15 +4,12 @@ import numpy as np
 from datetime import datetime
 
 
-
 logging.basicConfig(filename='local.log', encoding='utf-8', level=logging.DEBUG)
 #logging.disable('DEBUG') # If this line is uncommented, logging will occur, otherwise nothing will be logged
 logging.debug('\n\n\n\n--------------------STARTING NEW RUN - '+ str(datetime.now()) + ' --------------------')
 
 # ------------------- CUDA CHECK SECTION -------------------
 useCUDA = True # CHANGE THIS TO FALSE TO USE TORCH CPU
-
-
 import torch
 import testtorch
 
@@ -27,11 +24,17 @@ else:
 logging.debug(testtorch.test_version())
 # ----------------------------------------------------------
 
-
 import pandas as pd
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, ConcatDataset
 from sklearn.model_selection import KFold
+
+
+def reset_weights(m):
+  for layer in m.children():
+   if hasattr(layer, 'reset_parameters'):
+    logging.debug("Reset trainable parameters of layer = " + str(layer))
+    layer.reset_parameters()
 
 
 class LoadDataset1(Dataset):
@@ -145,6 +148,8 @@ if __name__ == "__main__":
     # print(DS.__getitem__(5))
 
     training_set, test_set =  np.split(DS.datain.sample(frac=1, random_state=68), [int((1.0-test_split)*len(DS))])
+    training_set= training_set.reset_index().drop(columns=['index'], axis=1)
+    test_set = test_set.reset_index().drop(columns=['index'], axis=1)
     logging.debug("Training Set \n" + str(training_set) + "\n")
     logging.debug("Test Set \n" + str(test_set) + "\n")
     combinationset = ConcatDataset([training_set, test_set])
@@ -155,10 +160,56 @@ if __name__ == "__main__":
     logging.debug("Starting model training and evaluation over " + str(kfold) + " cross-validation folds.")
 
     # TODO - John, Eric, Dominic - finish K-fold cross-validation 
-    exit()
-    for fold, (train_ids, test_ids) in enumerate(kfold.split(combinationset)):
-        print("to impliment")
 
+    for fold, (train, test) in enumerate(kfold.split(combinationset)):
+        print("to impliment")
+        print(train)
+        logging.debug("Fold " + str(fold))
+
+        train_subsampler = torch.utils.data.SubsetRandomSampler(train)
+        trainloader = DataLoader(combinationset, batch_size=4, sampler=train_subsampler)
+
+        test_subsampler = torch.utils.data.SubsetRandomSampler(test) 
+        testloader = DataLoader(combinationset, batch_size=4, sampler=test_subsampler)
+
+        model = CropYieldPredictionModel()
+        model.apply(reset_weights)
+        optimizer = torch.optim.Adam(model.parameters(), lr=2e-4)
+
+        for epoch in range(0, training_epochs):
+            
+            logging.debug("########## Epoch " + str(epoch+1) + " ##########")
+            current_loss = 0.0
+            print(next(iter(trainloader)))
+            exit()
+            for i, data in enumerate(trainloader, 0): # THIS LINE CAUSING AN ERROR FROM TRAINLOADER
+
+                print(i)
+
+                inputs, target = data
+                if useCUDA:
+                    inputs, target = inputs.cuda(), target.cuda()
+
+                optimizer.zero_grad()
+
+                output = model(inputs)
+
+                loss = loss_function(output, target)
+
+                loss.backward()
+
+                optimizer.step()
+
+                current_loss += loss.item()
+                if i % 5 == 0:
+                    print("Loss after mini-batch" + str(i+1) + "-" + str(current_loss / 5))
+                    current_loss = 0.0
+
+
+
+
+
+    exit()
 
     # Training Set
     DLTrain = torch.utils.data.DataLoader(DS, batch_size=12, shuffle=True)
@@ -166,9 +217,9 @@ if __name__ == "__main__":
     # Test Set
     DLTest = torch.utils.data.DataLoader(DS, batch_size=12, shuffle=True)
 
-    model = CropYieldPredictionModel()
     
-    optimizer = torch.optim.Adam(model.parameters())
+    
+    
 
     # Model Training
     model.train()
