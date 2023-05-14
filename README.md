@@ -9,6 +9,9 @@ General Info
 - Run on Windows
 - Using Python 3.10.7 & venv
 
+Link To Final Report
+- [<span style="font-size:x-large;">Final Report</span>](https://docs.google.com/document/d/1-6q0iwsEXat8JwnOvRDJ6vi3KlRc1Vl3PnygjGronbQ/edit)
+
 # Setup
 --------
 

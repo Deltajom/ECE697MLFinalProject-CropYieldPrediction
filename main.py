@@ -29,6 +29,7 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, ConcatDataset
 from sklearn.model_selection import KFold
 
+mode="???"
 
 def reset_weights(m):
   for layer in m.children():
@@ -39,7 +40,7 @@ def reset_weights(m):
 
 class LoadDataset1(Dataset):
     # Load dataset for a list of 1 or more countries, for 1 or more years, for a specific crop
-    def __init__(self, countries=None, years=None, crops=None, test_split=0.2):
+    def __init__(self, countries=None, years=None, crops=None):
         # Load and prune dataset of unnessesary data
 
         if countries==None and years==None and crops==None:
@@ -53,13 +54,13 @@ class LoadDataset1(Dataset):
 
         if years == "all":
             if crops == "all":
-                # TODO - Dominic, add the case where any crop, for any year, for a country in countries makes up the dataset
+                # TODO - Domenic, add the case where any crop, for any year, for a country in countries makes up the dataset
                 print("to impliment")
             else:
                 self.datain = self.datain[(self.datain[1].isin(countries)) & (self.datain[2].isin(crops))].reset_index().drop(columns=['index'], axis=1)
         else:
             if crops == "all":
-                # TODO - Dominic, add the case where any crop, for any set of years, for a country in countries makes up the dataset
+                # TODO - Domenic, add the case where any crop, for any set of years, for a country in countries makes up the dataset
                 print("to impliment")
             else:
                 # TODO - Eric, add the case where for a set of years, and a set of crops, for a set of countries makes up the dataset
@@ -120,7 +121,7 @@ class CropYieldPredictionModel(nn.Module):
         nn.MaxPool2d(2, 2),
         nn.Conv1d(6, 12, 5),
         nn.ReLU(),
-        nn.Linear(16 * 5 * 5, 120),
+        nn.Linear(16 * 5, 120),
         nn.Linear(120, 84),
         nn.Linear(84, 10),
         nn.Linear(10, 1)
@@ -142,16 +143,17 @@ if __name__ == "__main__":
     training_epochs = 40
     results = {}
     torch.manual_seed(420) # Might want to comment this, as it will have an effect on k-folds data
-    loss_function = torch.nn.MSELoss()
+    loss_function = torch.nn.MSELoss() # torch.sqrt() for RMSE
 
     DS = LoadDataset1(['Albania'], "all", ["Maize"])
     # print(DS.__getitem__(5))
 
     training_set, test_set =  np.split(DS.datain.sample(frac=1, random_state=68), [int((1.0-test_split)*len(DS))])
-    training_set= training_set.reset_index().drop(columns=['index'], axis=1)
-    test_set = test_set.reset_index().drop(columns=['index'], axis=1)
+    training_set = training_set.reset_index().drop(columns=['index'], axis=1).set_axis(range(training_set.shape[1]), axis=1)
+    test_set     = test_set.reset_index().drop(columns=['index'], axis=1).set_axis(range(test_set.shape[1]), axis=1)
     logging.debug("Training Set \n" + str(training_set) + "\n")
     logging.debug("Test Set \n" + str(test_set) + "\n")
+    
     combinationset = ConcatDataset([training_set, test_set])
 
     kfold = KFold(n_splits=k_folds, shuffle=True)
@@ -164,13 +166,15 @@ if __name__ == "__main__":
     for fold, (train, test) in enumerate(kfold.split(combinationset)):
         print("to impliment")
         print(train)
+        print(test)
         logging.debug("Fold " + str(fold))
 
+        # Batch size = 
         train_subsampler = torch.utils.data.SubsetRandomSampler(train)
-        trainloader = DataLoader(combinationset, batch_size=4, sampler=train_subsampler)
+        trainloader = DataLoader(combinationset, batch_size=1, sampler=train_subsampler)
 
         test_subsampler = torch.utils.data.SubsetRandomSampler(test) 
-        testloader = DataLoader(combinationset, batch_size=4, sampler=test_subsampler)
+        testloader = DataLoader(combinationset, batch_size=1, sampler=test_subsampler)
 
         model = CropYieldPredictionModel()
         model.apply(reset_weights)
@@ -180,8 +184,13 @@ if __name__ == "__main__":
             
             logging.debug("########## Epoch " + str(epoch+1) + " ##########")
             current_loss = 0.0
+
+            print(len(combinationset))
+            print(len(trainloader))
+            print(len(testloader))
+
             print(next(iter(trainloader)))
-            exit()
+
             for i, data in enumerate(trainloader, 0): # THIS LINE CAUSING AN ERROR FROM TRAINLOADER
 
                 print(i)
