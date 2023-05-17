@@ -63,8 +63,12 @@ class LoadDataset1(Dataset):
                 # TODO - Domenic, add the case where any crop, for any set of years, for a country in countries makes up the dataset
                 print("to impliment")
             else:
-                # TODO - Eric, add the case where for a set of years, and a set of crops, for a set of countries makes up the dataset
-                print("to impliment")
+                # select sets for years, crops, and countries
+                self.datain = self.datain[
+                    (self.datain[1].isin(countries)) &
+                    (self.datain[2].isin(crops)) &
+                    (self.datain[3].isin(years))
+                ].reset_index().drop(columns=['index'], axis=1)
 
         logging.debug("Parsed Input Dataset \n" + str(self.datain) + "\n")
 
