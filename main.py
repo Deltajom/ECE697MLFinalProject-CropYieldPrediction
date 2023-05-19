@@ -9,7 +9,7 @@ logging.basicConfig(filename='local.log', encoding='utf-8', level=logging.DEBUG)
 logging.debug('\n\n\n\n--------------------STARTING NEW RUN - '+ str(datetime.now()) + ' --------------------')
 
 # ------------------- CUDA CHECK SECTION -------------------
-useCUDA = True # CHANGE THIS TO FALSE TO USE TORCH CPU
+useCUDA = False # CHANGE THIS TO FALSE TO USE TORCH CPU
 import torch
 import testtorch
 
@@ -55,12 +55,20 @@ class LoadDataset1(Dataset):
         if years == "all":
             if crops == "all":
                 # TODO - Domenic, add the case where any crop, for any year, for a country in countries makes up the dataset
+                self.datain=self.datain[
+                    (self.datain[1].isin(countries)) &
+                    (self.datain[2].isin(crops)) & 
+                    (self.datain[3].isin(years))]
                 print("to impliment")
             else:
                 self.datain = self.datain[(self.datain[1].isin(countries)) & (self.datain[2].isin(crops))].reset_index().drop(columns=['index'], axis=1)
         else:
             if crops == "all":
                 # TODO - Domenic, add the case where any crop, for any set of years, for a country in countries makes up the dataset
+                self.datain=self.datain[
+                    (self.datain[1].isin(countries)) &
+                    (self.datain[2].isin(crops)) & 
+                    (self.datain[3].isin(years))]
                 print("to impliment")
             else:
                 # select sets for years, crops, and countries
