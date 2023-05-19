@@ -1,3 +1,13 @@
+#!/usr/bin/env python
+"""
+ML based Crop Yield Prediction By Country
+ECE 597/697 ML - UMass Amherst, Spring 2023
+
+@author Domenic McArthur<dmcarthur@umass.edu>
+@author Eric Webster<ewebster@umass.edu>
+@author John Murray<jomurray@umass.edu>
+"""
+
 import re
 import os
 import sys
@@ -14,20 +24,18 @@ logging.debug('\n\n\n\n--------------------STARTING NEW RUN - '+ str(datetime.no
 
 
 # ------------------- CUDA CHECK SECTION -------------------
-useCUDA = True # CHANGE THIS TO FALSE TO USE TORCH CPU
-import torch
-import testtorch
-
-
-if useCUDA:
-    res = testtorch.test_CUDA()
-    logging.debug(res[1])
-    if not res[0]:
-        sys.exit("ERROR - CUDA ACCELERATION SELECTED, BUT FAILED. If you do not want to use CUDA acceleration set useCUDA = False in main.py")
+if gpu.is_available():
+    logging.debug("[GPU Devices Available]")
+    for dev in range(gpu.device_count()):
+        logging.debug("Name: %s %s", gpu.get_device_name(dev),
+                      "(current)" if (gpu.current_device() == dev) else None)
+elif useCUDA:
+    logging.error("CUDA ACCELERATION SELECTED, BUT FAILED. If you do not want to use CUDA acceleration set useCUDA = False in main.py")
 else:
-    logging.debug("Using Torch CPU")
-logging.debug(testtorch.test_version())
+    logging.debug("Using Torch CPU version: %s", torch.__version__)
+
 # ----------------------------------------------------------
+
 
 
 import pandas as pd
@@ -66,7 +74,8 @@ class LoadDataset1(Dataset):
         # Load and prune dataset of unnessesary data
 
         if countries==None and years==None and crops==None:
-            sys.exit("ERROR, please specify what country/countries, year/years, and crop to use for dataset")
+            logging.error("Please specify what country/countries, year/years, and crop to use for dataset")
+            return False
 
         self.datain = pd.read_csv("Datasets/Dataset1/yield_df.csv", header=None, sep=',')
         self.datain = self.datain.drop(columns=[0], axis=1)
