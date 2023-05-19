@@ -95,3 +95,106 @@ DEBUG:root:Reset trainable parameters of layer = Linear(in_features=120, out_fea
 DEBUG:root:Reset trainable parameters of layer = Linear(in_features=84, out_features=10, bias=True)
 DEBUG:root:Reset trainable parameters of layer = Linear(in_features=10, out_features=1, bias=True)
 DEBUG:root:########## Epoch 1 ##########
+DEBUG:root:
+
+
+
+--------------------STARTING NEW RUN - 2023-05-19 13:34:08.780430 --------------------
+DEBUG:root:Fail! CUDA acceleration NOT available
+DEBUG:root:
+
+
+
+--------------------STARTING NEW RUN - 2023-05-19 13:34:43.512010 --------------------
+DEBUG:root:Using Torch CPU
+DEBUG:root:Torch version1.12.1
+DEBUG:root:Running program as standalone
+DEBUG:root:All Matching Dataset Format Referece (pay attention to indicies) - 
+1                             Area
+2                             Item
+3                             Year
+4                      hg/ha_yield
+5    average_rain_fall_mm_per_year
+6                pesticides_tonnes
+7                         avg_temp
+Name: 0, dtype: object
+DEBUG:root:All Matching Input Dataset 
+              1               2  ...                  6         7
+0          Area            Item  ...  pesticides_tonnes  avg_temp
+1       Albania           Maize  ...              121.0     16.37
+2       Albania        Potatoes  ...              121.0     16.37
+3       Albania     Rice, paddy  ...              121.0     16.37
+4       Albania         Sorghum  ...              121.0     16.37
+...         ...             ...  ...                ...       ...
+28238  Zimbabwe     Rice, paddy  ...            2550.07     19.76
+28239  Zimbabwe         Sorghum  ...            2550.07     19.76
+28240  Zimbabwe        Soybeans  ...            2550.07     19.76
+28241  Zimbabwe  Sweet potatoes  ...            2550.07     19.76
+28242  Zimbabwe           Wheat  ...            2550.07     19.76
+
+[28243 rows x 7 columns]
+
+DEBUG:root:Parsed Input Dataset 
+          1      2     3      4       5        6      7
+0   Albania  Maize  1990  36613  1485.0    121.0  16.37
+1   Albania  Maize  1991  29068  1485.0    121.0  15.36
+2   Albania  Maize  1992  24876  1485.0    121.0  16.06
+3   Albania  Maize  1993  24185  1485.0    121.0  16.05
+4   Albania  Maize  1994  25848  1485.0    201.0  16.96
+5   Albania  Maize  1995  31300  1485.0    251.0  15.67
+6   Albania  Maize  1996  32604  1485.0   313.96  15.64
+7   Albania  Maize  1997  31862  1485.0   376.93   15.9
+8   Albania  Maize  1998  33416  1485.0   439.89  16.27
+9   Albania  Maize  1999  37455  1485.0   502.86  16.57
+10  Albania  Maize  2000  38811  1485.0   565.82  16.67
+11  Albania  Maize  2001  38135  1485.0   628.79  16.59
+12  Albania  Maize  2002  39460  1485.0   691.75  16.47
+13  Albania  Maize  2004  46197  1485.0   817.68  16.16
+14  Albania  Maize  2005  45442  1485.0   880.64  15.67
+15  Albania  Maize  2006  50111  1485.0   943.61  15.92
+16  Albania  Maize  2007  46732  1485.0  1006.57  16.67
+17  Albania  Maize  2008  50000  1485.0  1069.54  16.71
+18  Albania  Maize  2009  55693  1485.0   1132.5  16.73
+19  Albania  Maize  2010  66790  1485.0  1311.17  16.52
+20  Albania  Maize  2011  59869  1485.0  1302.63  16.45
+21  Albania  Maize  2012  67290  1485.0   766.25   16.7
+22  Albania  Maize  2013  69533  1485.0   982.32  17.41
+
+DEBUG:root:Training Set 
+          1      2     3      4       5        6      7
+0   Albania  Maize  2011  59869  1485.0  1302.63  16.45
+1   Albania  Maize  2001  38135  1485.0   628.79  16.59
+2   Albania  Maize  1999  37455  1485.0   502.86  16.57
+3   Albania  Maize  2008  50000  1485.0  1069.54  16.71
+4   Albania  Maize  1992  24876  1485.0    121.0  16.06
+5   Albania  Maize  2012  67290  1485.0   766.25   16.7
+6   Albania  Maize  1990  36613  1485.0    121.0  16.37
+7   Albania  Maize  2010  66790  1485.0  1311.17  16.52
+8   Albania  Maize  1991  29068  1485.0    121.0  15.36
+9   Albania  Maize  1995  31300  1485.0    251.0  15.67
+10  Albania  Maize  1998  33416  1485.0   439.89  16.27
+11  Albania  Maize  2004  46197  1485.0   817.68  16.16
+12  Albania  Maize  1993  24185  1485.0    121.0  16.05
+13  Albania  Maize  2005  45442  1485.0   880.64  15.67
+14  Albania  Maize  2013  69533  1485.0   982.32  17.41
+15  Albania  Maize  1996  32604  1485.0   313.96  15.64
+16  Albania  Maize  2006  50111  1485.0   943.61  15.92
+17  Albania  Maize  2007  46732  1485.0  1006.57  16.67
+18  Albania  Maize  2002  39460  1485.0   691.75  16.47
+
+DEBUG:root:Test Set 
+         1      2     3      4       5       6      7
+0  Albania  Maize  2000  38811  1485.0  565.82  16.67
+1  Albania  Maize  1994  25848  1485.0   201.0  16.96
+2  Albania  Maize  1997  31862  1485.0  376.93   15.9
+3  Albania  Maize  2009  55693  1485.0  1132.5  16.73
+
+DEBUG:root:Starting model training and evaluation over KFold(n_splits=5, random_state=None, shuffle=True) cross-validation folds.
+DEBUG:root:Fold 0
+DEBUG:root:Reset trainable parameters of layer = Conv1d(3, 6, kernel_size=(5,), stride=(1,))
+DEBUG:root:Reset trainable parameters of layer = Conv1d(6, 12, kernel_size=(5,), stride=(1,))
+DEBUG:root:Reset trainable parameters of layer = Linear(in_features=400, out_features=120, bias=True)
+DEBUG:root:Reset trainable parameters of layer = Linear(in_features=120, out_features=84, bias=True)
+DEBUG:root:Reset trainable parameters of layer = Linear(in_features=84, out_features=10, bias=True)
+DEBUG:root:Reset trainable parameters of layer = Linear(in_features=10, out_features=1, bias=True)
+DEBUG:root:########## Epoch 1 ##########
