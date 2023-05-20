@@ -12,18 +12,36 @@ import re
 import os
 import sys
 import logging
-import numpy as np
 from datetime import datetime
 
-resdir = "Results/"+str(datetime.now().strftime("%m-%d-%Y-%H-%M-%S"))
+import numpy as np
+import torch
+import torch.cuda as gpu
 
-os.mkdir(resdir)
-logging.basicConfig(filename=resdir+'/local_run.log', encoding='utf-8', level=logging.DEBUG)
+# ------------------- LOGGING  -------------------
+# By default, log output writes to ./Results/MM-DD-YYY-HH-MM-SS/local_run.log only.
+# To output to standard error regardless, specify the STDERR environment variable.
+STDERR = os.environ.get('STDERR', '0')  # by default, we don't output to STDERR.
+
+# Change to logging.CRITICAL and only critical errors will be logged:
+# See: https://docs.python.org/3/library/logging.html#logging-levels
+LOGLVL = logging.DEBUG
+
+resdir = os.path.join(os.getcwd(), "Results", str(datetime.now().strftime("%m-%d-%Y-%H-%M-%S")))
+os.makedirs(resdir)
+
+logging.basicConfig(filename=os.path.join(resdir, 'local_run.log'), encoding='utf-8', level=LOGLVL)
 #logging.disable('DEBUG') # If this line is uncommented, logging will occur, otherwise nothing will be logged
-logging.debug('\n\n\n\n--------------------STARTING NEW RUN - '+ str(datetime.now()) + ' --------------------')
+
+if STDERR == '1':  # Setup the optional additional logger
+    logging.getLogger().addHandler(logging.StreamHandler())
+
+logging.debug('\n\n\n\n--------------------STARTING NEW RUN - %s --------------------', str(datetime.now()))
+# ------------------------------------------------
 
 
 # ------------------- CUDA CHECK SECTION -------------------
+useCUDA = True  # CHANGE THIS TO FALSE TO USE THE CPU INSTEAD
 if gpu.is_available():
     logging.debug("[GPU Devices Available]")
     for dev in range(gpu.device_count()):
@@ -64,45 +82,72 @@ mode="???"
 def reset_weights(m):
   for layer in m.children():
    if hasattr(layer, 'reset_parameters'):
-    logging.debug("Reset trainable parameters of layer = " + str(layer))
+    logging.debug("Reset trainable parameters of layer = %s", str(layer))
     layer.reset_parameters()
 
 
 class LoadDataset1(Dataset):
     # Load dataset for a list of 1 or more countries, for 1 or more years, for a specific crop
     def __init__(self, countries=None, years=None, crops=None):
-        # Load and prune dataset of unnessesary data
+        """
+        Load dataset1 for
+        @param countries is a list, or "all"
+        @param years is a list, a range (represented as a string), an integer, or "all"
+        @param crops is a list, or "all"
+        """
 
         if countries==None and years==None and crops==None:
             logging.error("Please specify what country/countries, year/years, and crop to use for dataset")
             return False
-
-        self.datain = pd.read_csv("Datasets/Dataset1/yield_df.csv", header=None, sep=',')
-        self.datain = self.datain.drop(columns=[0], axis=1)
-        logging.debug("All Matching Dataset Format Referece (pay attention to indicies) - \n" + str(self.datain.loc[self.datain.index[0]]))
-        logging.debug("All Matching Input Dataset \n" + str(self.datain) + "\n")
-        self.datain = self.datain.drop(index=0)
+        # Imports a Pandas DataFrame object:
+        data = pd.read_csv("Datasets/Dataset1/yield_df.csv", header=None, sep=',')
+        # NOTE: DataFrame objects (like this one) are referenced by Column then Row, unlike a Matrix
+        
+        # Drop 1st column from DataFrame, which is index:
+        data.drop(columns=0, axis='columns', inplace=True)
+        
+        logging.info("All Matching Dataset Format Referece (pay attention to indicies) - \n%s", str(data.loc[data.index[0]]))
+        logging.info("All Matching Input Dataset \n%s\n", str(data))
+        
+        # Drop 1st row from DataFrame, which holds labels:
+        data.drop(index=0, inplace=True)
 
         if years == "all":
             if crops == "all":
                 # TODO - Domenic, add the case where any crop, for any year, for a country in countries makes up the dataset
-                print("to impliment")
+                logging.warning("to impliment")
             else:
-                self.datain = self.datain[(self.datain[1].isin(countries)) & (self.datain[2].isin(crops))].reset_index().drop(columns=['index'], axis=1).set_axis(range(self.datain.shape[1]), axis=1)
+                data = data[(data[1].isin(countries)) &
+                            (data[2].isin(crops))].reset_index().drop(columns=['index'], axis='columns').set_axis(range(data.shape[1]), axis='columns')
+                
         else:
+            # ----- get 'years' -----
+            if isinstance(years, str) and re.fullmatch(r'\d{4}-\d{4}', years):
+                yearsRange = re.fullmatch(r'(\d{4})-(\d{4})', years)
+                # years given as an *inclusive* range, e.g. '2004-2016' is start of 2004 to end of 2016
+                # yearsRange is a new variable representing the match, or None if no match
+                rangeObj = range(int(yearsRange.group(1)), int(yearsRange.group(2))+1)
+                # remember that DataFrame object matches on row/col *values*, so you must be careful
+                # with indicies, and you cannot pass any int as a row or col label.
+                years = [str(x) for x in rangeObj]
+            else:
+                years = [str(years)]
+            # ----- end get 'years' -----
+            
             if crops == "all":
                 # TODO - Domenic, add the case where any crop, for any set of years, for a country in countries makes up the dataset
-                print("to impliment")
+                logging.warning("to impliment")
             else:
                 # select sets for years, crops, and countries
-                self.datain = self.datain[
-                    (self.datain[1].isin(countries)) &
-                    (self.datain[2].isin(crops)) &
-                    (self.datain[3].isin(years))
-                ].reset_index().drop(columns=['index'], axis=1).set_axis(range(self.datain.shape[1]), axis=1)
+                data = data[(data[1].isin(countries)) &
+                            (data[2].isin(crops)) &
+                            (data[3].isin(years))].reset_index().drop(columns=['index'], axis='columns').set_axis(range(data.shape[1]), axis='columns')
 
-        logging.debug("Parsed Input Dataset \n" + str(self.datain) + "\n")
+        logging.info("Parsed Input Dataset \n%s\n", str(data))
+        self.datain = data
 
+        logging.debug(f"self.datain[5] => {self.datain[5]}")
+        logging.debug(f"self.datain[5][20] => {self.datain[5][20]}")
 
     def __len__(self):
         return len(self.datain)
@@ -110,11 +155,49 @@ class LoadDataset1(Dataset):
 
     # For now, I've excluded year from the inputs, if we want to expand the dataset then we could start with country 
     # GDP and bring year back in (Hypothesis being, higher GDP, better farming equipment and management, higher yield)
-    def __getitem__(self, indx):
-        x = torch.tensor([float(self.datain[5][indx]), float(self.datain[6][indx]), float(self.datain[7][indx])], dtype=torch.float)
-        y = torch.tensor(float(self.datain[4][indx]), dtype=torch.float)
+    def __getitem__(self, index):
+        x = torch.tensor([
+            float(self.datain[5][index]), # rainfall
+            float(self.datain[6][index]), # pesticide
+            float(self.datain[7][index])  # temp
+        ], dtype=torch.float)
+        y = torch.tensor(float(self.datain[4][index]), dtype=torch.float) # yield
         return x, y
 
+    def split_test_training(self, test_split):
+        # Splitting the datain
+        
+        self.training_set, self.test_set = np.split(
+            self.datain.sample(frac=1, random_state=68), # the data to be split up
+            [int((1.0-test_split)*len(self))]            # indices or sections at which array is split
+        )
+        logging.debug(f"Original data: \n{str(self.datain.sample(frac=1, random_state=68))}")
+        logging.debug(f"Training set: \n{self.training_set}\n")
+        logging.debug(f"Test set: \n{self.test_set}\n")
+
+    @staticmethod
+    def reset_index(dataframe):
+        """ Do a proper reset of indices so that the labels on the table match up to where the entries are positionally. """
+        return(dataframe.reset_index().drop(columns=['index'], axis=1).set_axis(range(dataframe.shape[1]), axis=1))
+
+    def add_data_labels(self):
+        self.training_set = LoadDataset1.reset_index(self.training_set)
+        logging.debug("Training Set with labels \n%s\n", str(self.training_set))
+        self.test_set = LoadDataset1.reset_index(self.test_set)
+        logging.debug("Test Set with labels \n%s\n", str(self.test_set))
+        return
+
+    @staticmethod
+    def drop_cols(dataframe, cols):
+        """ Fully drop columns and subsequently adjust the index """
+        return(dataframe.reset_index().drop(columns=cols, axis=1))
+
+    def drop_area_item(self):
+        self.training_set = LoadDataset1.drop_cols(self.training_set, [0,1,2, 'index'])
+        self.test_set     = LoadDataset1.drop_cols(self.test_set,     [0,1,2, 'index'])
+        return
+
+    
         # region Oldstuff
 
         # DONT NEED THIS PROCESSING, IT TAKES A LONG TIME AND YOU CAN JUST FORMAT AND PASS THINGS WITH THE __get_item__ function and pandas .loc/.loci
@@ -183,31 +266,27 @@ if __name__ == "__main__":
     
     # K-folds cross-validation implimentation referenced from
     # https://github.com/christianversloot/machine-learning-articles/blob/main/how-to-use-k-fold-cross-validation-with-pytorch.md
-    k_folds = 4
-    test_split = 0.15
+    k_folds         = 4
+    test_split      = 0.15
     training_epochs = 400
-    results = {}
+    results         = {}
     torch.manual_seed(420) # Might want to comment this, as it will have an effect on k-folds data
-    loss_function = RMSELoss()
+    loss_function   = RMSELoss()
 
-    DS = LoadDataset1(['Bahamas', 'Bangladesh', 'Brazil','Guatemala','Germany'], "all", ["Maize"])
+    DS = LoadDataset1(['Bahamas', 'Bangladesh', 'Brazil','Guatemala','Germany'], "1990-2004", ["Maize"])
     # print(DS.__getitem__(5))
 
-    # region TODO - MOVE INTO DATASET1 CLASS
-
-    training_set, test_set =  np.split(DS.datain.sample(frac=1, random_state=68), [int((1.0-test_split)*len(DS))])
-    training_set = training_set.reset_index().drop(columns=['index'], axis=1).set_axis(range(training_set.shape[1]), axis=1)
-    test_set     = test_set.reset_index().drop(columns=['index'], axis=1).set_axis(range(test_set.shape[1]), axis=1)
-    logging.debug("Training Set with labels \n" + str(training_set) + "\n")
-    logging.debug("Test Set with labels \n" + str(test_set) + "\n")
-
-    training_set = training_set.reset_index().drop(columns=[0,1,2,'index'], axis=1)
-    test_set     = test_set.reset_index().drop(columns=[0,1,2, 'index'], axis=1)
-    training_set = training_set.set_axis(range(training_set.shape[1]), axis=1)
-    test_set     = test_set.set_axis(range(test_set.shape[1]), axis=1)
-    logging.debug("Training Set raw \n" + str(training_set) + "\n")
-    logging.debug("Test Set raw \n" + str(test_set) + "\n")
-
+    # Operations on Test and Training data:
+    DS.split_test_training(test_split)  # test and training are in the class now
+    DS.add_data_labels()                # Reset the index on test and training so it counts up normally
+    
+    DS.drop_area_item()                 # Drop columns 0 (index), 1 (area), and 2 (item)
+    
+    logging.debug("----- RAW DATA -----")
+    DS.add_data_labels()                # We reset the index again
+    training_set = DS.training_set
+    test_set = DS.test_set
+    
     training_set_xs = training_set[[training_set.columns[1],training_set.columns[2],training_set.columns[3]]].to_numpy().astype(np.float32)
     training_set_ys = training_set[training_set.columns[0]].to_numpy().astype(np.float32)
     # region Expanded Loop now uses list comnprehention
@@ -244,11 +323,9 @@ if __name__ == "__main__":
         model.apply(reset_weights)
         optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
-        print("Training Model for Fold "+ str(fold))
         logging.debug("Training Model for Fold "+ str(fold))
 
         for epoch in range(0, training_epochs):
-            print("Fold - " + str(fold) +  " Epoch - " + str(epoch+1))
             logging.debug("########## Fold - " + str(fold) +  " Epoch - " + str(epoch+1) + " ##########")
             current_loss = 0.0
 
