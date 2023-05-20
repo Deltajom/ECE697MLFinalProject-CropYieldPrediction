@@ -39,9 +39,8 @@ if STDERR == '1':  # Setup the optional additional logger
 logging.debug('\n\n\n\n--------------------STARTING NEW RUN - %s --------------------', str(datetime.now()))
 # ------------------------------------------------
 
-
 # ------------------- CUDA CHECK SECTION -------------------
-useCUDA = True  # CHANGE THIS TO FALSE TO USE THE CPU INSTEAD
+useCUDA = True  # CHANGE THIS TO FALSE TO USE TORCH CPU
 if gpu.is_available():
     logging.debug("[GPU Devices Available]")
     for dev in range(gpu.device_count()):
@@ -54,28 +53,10 @@ else:
 
 # ----------------------------------------------------------
 
-
-
 import pandas as pd
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, ConcatDataset
 from sklearn.model_selection import KFold
-
-
-#print(torch.randn(4, 3, 5))
-
-# R  = Rainfall
-# P = pesticides
-# T = Temperature
-
-# [ R, P, T ]
-
-#[
-# [ R, P, T ]
-# [ P, R, T ]     Possible input modifications
-# [ T, R, P ] 
-# ]
-
 
 mode="???"
 
@@ -114,12 +95,14 @@ class LoadDataset1(Dataset):
 
         if years == "all":
             if crops == "all":
-                # TODO - Domenic, add the case where any crop, for any year, for a country in countries makes up the dataset
-                logging.warning("to impliment")
+               
+                data=data[
+                    (data[1].isin(countries='Albania')) 
+                   ]
+                    
+                print("to impliment")
             else:
-                data = data[(data[1].isin(countries)) &
-                            (data[2].isin(crops))].reset_index().drop(columns=['index'], axis='columns').set_axis(range(data.shape[1]), axis='columns')
-                
+                data = data[(data[1].isin(countries)) & (data[2].isin(crops))].reset_index().drop(columns=['index'], axis=1)
         else:
             # ----- get 'years' -----
             if isinstance(years, str) and re.fullmatch(r'\d{4}-\d{4}', years):
@@ -135,7 +118,10 @@ class LoadDataset1(Dataset):
             # ----- end get 'years' -----
             
             if crops == "all":
-                # TODO - Domenic, add the case where any crop, for any set of years, for a country in countries makes up the dataset
+                # The case where any crop, for any set of years, for a country in countries makes up the dataset
+                data=data[
+                    (data[1].isin(countries='Albania')) &
+                    (data[3].isin(years=[1996,2004]))]
                 logging.warning("to impliment")
             else:
                 # select sets for years, crops, and countries
@@ -144,7 +130,7 @@ class LoadDataset1(Dataset):
                             (data[3].isin(years))].reset_index().drop(columns=['index'], axis='columns').set_axis(range(data.shape[1]), axis='columns')
 
         logging.info("Parsed Input Dataset \n%s\n", str(data))
-        self.datain = data
+        self.datain = data  # finally set self.datain
 
         logging.debug(f"self.datain[5] => {self.datain[5]}")
         logging.debug(f"self.datain[5][20] => {self.datain[5][20]}")
@@ -228,36 +214,26 @@ class LoadDataset1(Dataset):
 
         # endregion Oldstuff
 
-class RMSELoss(torch.nn.Module):
-    def __init__(self):
-        super(RMSELoss,self).__init__()
 
-    def forward(self,x,y):
-        MSE_loss = nn.MSELoss()
-        RMSE_loss = torch.sqrt(MSE_loss(x, y))
-        return RMSE_loss
 
 class CropYieldPredictionModel(nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv1 = nn.Conv1d(in_channels=1, out_channels=420, kernel_size=3, bias=True).cuda()
-        self.zeropad2 = nn.ZeroPad2d((1, 1, 0, 0)).cuda()
-        self.conv2 = nn.Conv1d(in_channels=420, out_channels=120, kernel_size=3, bias=True).cuda()
-        self.conv3 = nn.Conv1d(in_channels=120, out_channels=60, kernel_size=3, bias=True).cuda()
-        self.conv4 = nn.Conv1d(in_channels=60, out_channels=1, kernel_size=3, bias=True).cuda()
+        # After super initialize model structures
+        self.layers = nn.Sequential(
+        nn.Conv1d(3, 6, 5),
+        nn.MaxPool2d(2, 2),
+        nn.Conv1d(6, 12, 5),
+        nn.ReLU(),
+        nn.Linear(16 * 5, 120),
+        nn.Linear(120, 84),
+        nn.Linear(84, 10),
+        nn.Linear(10, 1)
+        )
 
     # Provide model path
     def forward(self, x):
-        #print("Layer 1 input" + str(x))
-        x = self.zeropad2(torch.nn.functional.relu(self.conv1(x)))
-        #print("Layer 2 input" + str(x))
-        x = self.zeropad2(torch.nn.functional.relu(self.conv2(x)))
-        #print("Layer 3 input" + str(x))
-        x = self.zeropad2(torch.nn.functional.relu(self.conv3(x)))
-        #print("Layer 4 input" + str(x))
-        x = torch.nn.functional.relu(self.conv4(x))
-        #print(x)
-        return x
+        return self.layers(x)
 
 
 
@@ -266,16 +242,18 @@ if __name__ == "__main__":
     
     # K-folds cross-validation implimentation referenced from
     # https://github.com/christianversloot/machine-learning-articles/blob/main/how-to-use-k-fold-cross-validation-with-pytorch.md
-    k_folds         = 4
+<<<<<<< HEAD
+    k_folds         = 5
     test_split      = 0.15
-    training_epochs = 400
+    training_epochs = 40
     results         = {}
     torch.manual_seed(420) # Might want to comment this, as it will have an effect on k-folds data
-    loss_function   = RMSELoss()
+    loss_function   = torch.nn.MSELoss() # torch.sqrt() for RMSE
 
     DS = LoadDataset1(['Bahamas', 'Bangladesh', 'Brazil','Guatemala','Germany'], "1990-2004", ["Maize"])
     # print(DS.__getitem__(5))
 
+    # ----- BEGIN SECTION MIGRATING TO LOADDATASET1 CLASS -----
     # Operations on Test and Training data:
     DS.split_test_training(test_split)  # test and training are in the class now
     DS.add_data_labels()                # Reset the index on test and training so it counts up normally
@@ -284,71 +262,82 @@ if __name__ == "__main__":
     
     logging.debug("----- RAW DATA -----")
     DS.add_data_labels()                # We reset the index again
+    
+    # NOTE: Here's where Eric left off. -----
     training_set = DS.training_set
     test_set = DS.test_set
+
+    logging.debug("Training Set \n" + str(training_set) + "\n")
+    logging.debug("Test Set \n" + str(test_set) + "\n")
     
-    training_set_xs = training_set[[training_set.columns[1],training_set.columns[2],training_set.columns[3]]].to_numpy().astype(np.float32)
-    training_set_ys = training_set[training_set.columns[0]].to_numpy().astype(np.float32)
+    # NOTE: Saw this dissappear when merging. Are we going to forego the training set dict?
+    # ----- BEGIN TRAINING SET DICT -----
+    #training_set_xs = training_set[[training_set.columns[1],training_set.columns[2],training_set.columns[3]]].to_numpy().astype(np.float32)
+    #training_set_ys = training_set[training_set.columns[0]].to_numpy().astype(np.float32)
     # region Expanded Loop now uses list comnprehention
-    trainingdict = {}
+    #trainingdict = {}
     # for row in range(0,len(training_set_xs)):
     #     trainingdict[row] = {"x": training_set_xs[row], "y":training_set_ys[row]}
     # endregion Expanded Loop now uses list comnprehention
-    trainingsetdict = {row: {"x": training_set_xs[row], "y": training_set_ys[row]} for row in range(len(training_set_xs))}
-    logging.debug("Training Set dictionary \n" + re.sub("(.{82})", "\\1\n", str(trainingsetdict), 0, re.DOTALL) + "\n")
-    test_set_xs     = test_set[[test_set.columns[1],test_set.columns[2],test_set.columns[3]]].to_numpy().astype(np.float32)
-    test_set_ys     = test_set[test_set.columns[0]].to_numpy().astype(np.float32)
-    testsetdict     = {row: {"x": test_set_xs[row], "y": test_set_ys[row]} for row in range(len(test_set_xs))}
-    logging.debug("Test Set dictionary \n" + re.sub("(.{82})", "\\1\n", str(testsetdict), 0, re.DOTALL) + "\n")
+    #trainingsetdict = {row: {"x": training_set_xs[row], "y": training_set_ys[row]} for row in range(len(training_set_xs))}
+    #logging.debug("Training Set dictionary \n" + re.sub("(.{82})", "\\1\n", str(trainingsetdict), 0, re.DOTALL) + "\n")
+    #test_set_xs     = test_set[[test_set.columns[1],test_set.columns[2],test_set.columns[3]]].to_numpy().astype(np.float32)
+    #test_set_ys     = test_set[test_set.columns[0]].to_numpy().astype(np.float32)
+    #testsetdict     = {row: {"x": test_set_xs[row], "y": test_set_ys[row]} for row in range(len(test_set_xs))}
+    #logging.debug("Test Set dictionary \n" + re.sub("(.{82})", "\\1\n", str(testsetdict), 0, re.DOTALL) + "\n")
+    # ----- END TRAINING SET DICT -----
     
-    # endregion TODO - MOVE INTO DATASET1 CLASS
-
-    combinationset = ConcatDataset([trainingdict, testsetdict])
+    combinationset = ConcatDataset([training_set, test_set])
 
     kfold = KFold(n_splits=k_folds, shuffle=True)
 
     # Starting Model Training and Evaluation Here
-    logging.debug("Starting model training and evaluation over " + str(kfold) + " cross-validation folds.")
+    logging.debug("Starting model training and evaluation over %s cross-validation folds.", str(kfold))
+
+    # TODO - John, Eric, Dominic - finish K-fold cross-validation 
 
     for fold, (train, test) in enumerate(kfold.split(combinationset)):
-        
+        print("to impliment")
+        print(train)
+        print(test)
+        logging.debug("Fold %s", str(fold))
+
         # Batch size = 
         train_subsampler = torch.utils.data.SubsetRandomSampler(train)
-        trainloader = DataLoader(combinationset, batch_size=12, sampler=train_subsampler)
+        trainloader = DataLoader(combinationset, batch_size=1, sampler=train_subsampler)
 
         test_subsampler = torch.utils.data.SubsetRandomSampler(test) 
-        testloader = DataLoader(combinationset, batch_size=12, sampler=test_subsampler)
+        testloader = DataLoader(combinationset, batch_size=1, sampler=test_subsampler)
 
         model = CropYieldPredictionModel()
         model.apply(reset_weights)
-        optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
-        logging.debug("Training Model for Fold "+ str(fold))
+        optimizer = torch.optim.Adam(model.parameters(), lr=2e-4)
 
         for epoch in range(0, training_epochs):
-            logging.debug("########## Fold - " + str(fold) +  " Epoch - " + str(epoch+1) + " ##########")
+            logging.debug("########## Epoch " + str(epoch+1) + " ##########")
+
             current_loss = 0.0
+
+            print(len(combinationset))
+            print(len(trainloader))
+            print(len(testloader))
+
+            print(next(iter(trainloader)))
 
             for i, data in enumerate(trainloader, 0): # THIS LINE CAUSING AN ERROR FROM TRAINLOADER
 
-                inputs = data["x"]
-                inputs = inputs.unsqueeze(1)
-                targets = data["y"]
-                # print(i)
-                # print(data)
-                # print(inputs)
-                # print(targets)
+                print(i)
+
+                inputs, target = data
                 if useCUDA:
-                    inputs, targets = inputs.cuda(), targets.cuda()
+                    inputs, target = inputs.cuda(), target.cuda()
 
                 optimizer.zero_grad()
-                
-                #print(targets)
 
                 output = model(inputs)
-                #print(output)
 
-                loss = loss_function(output, targets)
+                loss = loss_function(output, target)
 
                 loss.backward()
 
@@ -356,61 +345,42 @@ if __name__ == "__main__":
 
                 current_loss += loss.item()
                 if i % 5 == 0:
-                    logging.debug("RMSE Loss after batch member " + str(i+1) + " = " + str(current_loss / 5))
+                    print("Loss after mini-batch" + str(i+1) + "-" + str(current_loss / 5))
                     current_loss = 0.0
 
-        print("Training Model for Fold "+ str(fold)+" completed, saving model.")
-        logging.debug("Training Model for Fold "+ str(fold)+" completed, saving model.")
 
-        save_path = resdir+"/model-fold-"+str(fold)+".pth"
-        torch.save(model.state_dict(), save_path)
+
+
+
+    exit()
+
+    # Training Set
+    DLTrain = torch.utils.data.DataLoader(DS, batch_size=12, shuffle=True)
+
+    # Test Set
+    DLTest = torch.utils.data.DataLoader(DS, batch_size=12, shuffle=True)
+
+    
+    
+    
+
+    # Model Training
+    model.train()
+    for epoch in range(training_epochs):
+        for X_batch, y_batch in DLT:
+            if useCUDA:
+                X_batch, y_batch = X_batch.cuda(), y_batch.cuda()
+            y_pred = model(X_batch)
+            loss = loss_fn(y_pred, y_batch)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
         
-        print("Testing Model for Fold "+ str(fold))
-        logging.debug("Testing Model for Fold "+ str(fold))
-
-        # TODO - John, Eric, Dominic - finish K-fold cross-validation 05/18/2023 DO IT HERE BOI fix it up
-
-        # Evaluation for this fold
-        correct, total = 0, 0
-        with torch.no_grad():
-            # Iterate over the test data and generate predictions
-            for i, data in enumerate(testloader, 0):
-
-                # Get inputs
-                inputs = data["x"][0].unsqueeze(0)
-                inputs = inputs.unsqueeze(1)
-                targets = data["y"]
-
-                if useCUDA:
-                    inputs, targets = inputs.cuda(), targets.cuda()
-
-                # Generate outputs
-                outputs = model(inputs)
-
-                # Set total and correct
-                _, predicted = torch.max(outputs.data, 1)
-                total += targets.size(0)
-                correct += (predicted == targets).sum().item()
-
-            # Print accuracy
-            print('Accuracy for fold %d: %d %%' % (fold, 100.0 * correct / total))
-            print('--------------------------------')
-            results[fold] = 100.0 * (correct / total)
-
-    # Print fold results
-  
-    print(f'K-FOLD CROSS VALIDATION RESULTS FOR {k_folds} FOLDS')
-    print('--------------------------------')
-    sum = 0.0
-    for key, value in results.items():
-        print(f'Fold {key}: {value} %')
-        sum += value
-    print(f'Average: {sum/len(results.items())} %')
     
     # Test model
-    #model.eval()
-    #y_pred = model(X_test)
-    #acc = (y_pred.round() == y_test).float().mean()
+    model.eval()
+    y_pred = model(X_test)
+    acc = (y_pred.round() == y_test).float().mean()
 
 
 else:
