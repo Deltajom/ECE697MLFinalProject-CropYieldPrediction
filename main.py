@@ -13,6 +13,7 @@ import os
 import sys
 import logging
 from datetime import datetime
+import matplotlib.pyplot as pl
 
 import numpy as np
 import torch
@@ -306,9 +307,10 @@ if __name__ == "__main__":
 
     # Starting Model Training and Evaluation Here
     logging.debug("Starting model training and evaluation over %s cross-validation folds.", str(kfold))
-
+    
     for fold, (train, test) in enumerate(kfold.split(combinationset)):
         # Batch size = 
+        lossarray=[]
         train_subsampler = torch.utils.data.SubsetRandomSampler(train)
         trainloader = DataLoader(combinationset, batch_size=4, sampler=train_subsampler)
 
@@ -326,9 +328,9 @@ if __name__ == "__main__":
             print("Fold - " + str(fold) +  " Epoch - " + str(epoch+1))
             logging.debug("########## Fold - " + str(fold) +  " Epoch - " + str(epoch+1) + " ##########")
             current_loss = 0.0
-
+           
             for i, data in enumerate(trainloader, 0): # THIS LINE CAUSING AN ERROR FROM TRAINLOADER
-
+               
                 inputs = data["x"]
                 inputs = inputs.unsqueeze(1)
                 targets = data["y"]
@@ -343,14 +345,21 @@ if __name__ == "__main__":
                 loss = loss_function(outputs.flatten(), targets)
 
                 loss.backward()
-
+                
                 optimizer.step()
 
                 current_loss += loss.item()
+            
                 if i % 5 == 0:
                     logging.debug("RMSE Loss after batch member " + str(i+1) + " = " + str(current_loss / 5))
                     current_loss = 0.0
-
+            lossarray.append(current_loss)
+        epochs=np.arange(0,len(lossarray))
+        pl.plot(epochs,lossarray,'r')
+        pl.ylabel('Loss')
+        pl.xlabel('Epoch')
+        pl.title('Loss vs Epoch')
+        pl.show()
         print("Training Model for Fold "+ str(fold)+" completed, saving model.")
         logging.debug("Training Model for Fold "+ str(fold)+" completed, saving model.")
 
