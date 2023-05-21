@@ -230,12 +230,19 @@ class RMSELoss(torch.nn.Module):
 class CropYieldPredictionModel(nn.Module):
     def __init__(self):
         super().__init__()
-        self.zeropad2 = nn.ZeroPad2d((1, 1, 0, 0)).cuda()
-        self.conv1 = nn.Conv1d(in_channels=1, out_channels=60, kernel_size=3, bias=True).cuda() 
-        self.conv2 = nn.Conv1d(in_channels=60, out_channels=20, kernel_size=3, bias=True).cuda()
-        self.conv3 = nn.Conv1d(in_channels=20, out_channels=10, kernel_size=3, bias=True).cuda()
-        self.conv4 = nn.Conv1d(in_channels=10, out_channels=5, kernel_size=3, bias=True).cuda()
-        self.conv5 = nn.Conv1d(in_channels=5, out_channels=1, kernel_size=3, bias=True).cuda()
+        if(useCUDA):
+            self.zeropad2 = nn.ZeroPad2d((1, 1, 0, 0)).cuda()
+            self.conv1 = nn.Conv1d(in_channels=1, out_channels=8, kernel_size=3, bias=True).cuda() 
+            self.conv2 = nn.Conv1d(in_channels=8, out_channels=16, kernel_size=3, bias=True).cuda()
+            self.l1 = nn.Linear(in_features=16*3, out_features=3, bias=True).cuda()
+            self.l2 = nn.Linear(in_features=3, out_features=1, bias=True).cuda()
+        else:
+            self.zeropad2 = nn.ZeroPad2d((1, 1, 0, 0))
+            self.conv1 = nn.Conv1d(in_channels=1, out_channels=60, kernel_size=3, bias=True)
+            self.conv2 = nn.Conv1d(in_channels=60, out_channels=20, kernel_size=3, bias=True)
+            self.conv3 = nn.Conv1d(in_channels=20, out_channels=10, kernel_size=3, bias=True)
+            self.conv4 = nn.Conv1d(in_channels=10, out_channels=5, kernel_size=3, bias=True)
+            self.conv5 = nn.Conv1d(in_channels=5, out_channels=1, kernel_size=3, bias=True)
 
     # Provide model path
     def forward(self, x):
@@ -244,11 +251,11 @@ class CropYieldPredictionModel(nn.Module):
         #print("Layer 2 input" + str(x))
         x = self.zeropad2(torch.nn.functional.relu(self.conv2(x)))
         #print("Layer 3 input" + str(x))
-        x = self.zeropad2(torch.nn.functional.relu(self.conv3(x)))
+        x = torch.nn.functional.relu(self.l1(x))
         #print("Layer 4 input" + str(x))
-        x = self.zeropad2(torch.nn.functional.relu(self.conv4(x)))
+        x = torch.nn.functional.relu(self.l2(x))
         #print("Layer 5 input" + str(x))
-        x = torch.nn.functional.relu(self.conv5(x))
+        #x = torch.nn.functional.relu(self.conv5(x))
         #print(x)
         return x
 
@@ -266,7 +273,7 @@ if __name__ == "__main__":
     torch.manual_seed(420) # Might want to comment this, as it will have an effect on k-folds data
     loss_function = RMSELoss()
 
-    DS = LoadDataset1(['Bahamas', 'Bangladesh', 'Brazil','Guatemala','Germany'], "1990-2004", ["Maize"])
+    DS = LoadDataset1(['Bahamas', 'Bangladesh', 'Brazil','Guatemala','Germany'], "all", ["Maize"])
     # print(DS.__getitem__(5))
 
     # ----- BEGIN SECTION MIGRATING TO LOADDATASET1 CLASS -----
@@ -319,7 +326,7 @@ if __name__ == "__main__":
 
         model = CropYieldPredictionModel()
         model.apply(reset_weights)
-        optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+        optimizer = torch.optim.Adam(model.parameters(), lr=1.7e-4)
 
         print("Training Model for Fold "+ str(fold))
         logging.debug("Training Model for Fold "+ str(fold))
