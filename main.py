@@ -229,11 +229,12 @@ class RMSELoss(torch.nn.Module):
 class CropYieldPredictionModel(nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv1 = nn.Conv1d(in_channels=1, out_channels=40, kernel_size=3, bias=True).cuda()
         self.zeropad2 = nn.ZeroPad2d((1, 1, 0, 0)).cuda()
-        self.conv2 = nn.Conv1d(in_channels=40, out_channels=30, kernel_size=3, bias=True).cuda()
-        self.conv3 = nn.Conv1d(in_channels=30, out_channels=20, kernel_size=3, bias=True).cuda()
-        self.conv4 = nn.Conv1d(in_channels=20, out_channels=1, kernel_size=3, bias=True).cuda()
+        self.conv1 = nn.Conv1d(in_channels=1, out_channels=60, kernel_size=3, bias=True).cuda() 
+        self.conv2 = nn.Conv1d(in_channels=60, out_channels=20, kernel_size=3, bias=True).cuda()
+        self.conv3 = nn.Conv1d(in_channels=20, out_channels=10, kernel_size=3, bias=True).cuda()
+        self.conv4 = nn.Conv1d(in_channels=10, out_channels=5, kernel_size=3, bias=True).cuda()
+        self.conv5 = nn.Conv1d(in_channels=5, out_channels=1, kernel_size=3, bias=True).cuda()
 
     # Provide model path
     def forward(self, x):
@@ -244,7 +245,9 @@ class CropYieldPredictionModel(nn.Module):
         #print("Layer 3 input" + str(x))
         x = self.zeropad2(torch.nn.functional.relu(self.conv3(x)))
         #print("Layer 4 input" + str(x))
-        x = torch.nn.functional.relu(self.conv4(x))
+        x = self.zeropad2(torch.nn.functional.relu(self.conv4(x)))
+        #print("Layer 5 input" + str(x))
+        x = torch.nn.functional.relu(self.conv5(x))
         #print(x)
         return x
 
@@ -303,18 +306,14 @@ if __name__ == "__main__":
 
     # Starting Model Training and Evaluation Here
     logging.debug("Starting model training and evaluation over %s cross-validation folds.", str(kfold))
-    
-    print(next(iter(combinationset)))
-
-    # TODO - John, Eric, Dominic - finish K-fold cross-validation 
 
     for fold, (train, test) in enumerate(kfold.split(combinationset)):
         # Batch size = 
         train_subsampler = torch.utils.data.SubsetRandomSampler(train)
-        trainloader = DataLoader(combinationset, batch_size=12, sampler=train_subsampler)
+        trainloader = DataLoader(combinationset, batch_size=4, sampler=train_subsampler)
 
         test_subsampler = torch.utils.data.SubsetRandomSampler(test) 
-        testloader = DataLoader(combinationset, batch_size=12, sampler=test_subsampler)
+        testloader = DataLoader(combinationset, batch_size=4, sampler=test_subsampler)
 
         model = CropYieldPredictionModel()
         model.apply(reset_weights)
@@ -329,24 +328,19 @@ if __name__ == "__main__":
             current_loss = 0.0
 
             for i, data in enumerate(trainloader, 0): # THIS LINE CAUSING AN ERROR FROM TRAINLOADER
+
                 inputs = data["x"]
                 inputs = inputs.unsqueeze(1)
                 targets = data["y"]
-                # print(i)
-                # print(data)
-                # print(inputs)
-                # print(targets)
+
                 if useCUDA:
                     inputs, targets = inputs.cuda(), targets.cuda()
 
                 optimizer.zero_grad()
-                
-                #print(targets)
 
-                output = model(inputs)
-                #print(output)
+                outputs = model(inputs)
 
-                loss = loss_function(output, targets)
+                loss = loss_function(outputs.flatten(), targets)
 
                 loss.backward()
 
@@ -366,36 +360,33 @@ if __name__ == "__main__":
         print("Testing Model for Fold "+ str(fold))
         logging.debug("Testing Model for Fold "+ str(fold))
 
-        # TODO - John, Eric, Dominic - finish K-fold cross-validation 05/18/2023 DO IT HERE BOI fix it up
-
         # Evaluation for this fold
-        correct, total = 0, 0
+        multirunavgofavgs = 0
+        n=0
         with torch.no_grad():
             # Iterate over the test data and generate predictions
             for i, data in enumerate(testloader, 0):
-
-                # Get inputs
-                inputs = data["x"][0].unsqueeze(0)
+                
+                inputs = data["x"]
                 inputs = inputs.unsqueeze(1)
                 targets = data["y"]
 
                 if useCUDA:
                     inputs, targets = inputs.cuda(), targets.cuda()
 
-                # Generate outputs
                 outputs = model(inputs)
 
+                # Find average percengate error, where %error = (| Experimental measurements - Actual measurements | / Actual measurements)*100 (element-wise) sum these and 
+                # divide by number of inputs
+                runavgerror = torch.mean(torch.mul(torch.div(torch.abs(torch.sub(outputs.flatten(), targets)), targets),100))
+
                 # Set total and correct
-                _, predicted = torch.max(outputs.data, 1)
-                total += targets.size(0)
-                correct += (predicted == targets).sum().item()
+                multirunavgofavgs += runavgerror
+                n+=1
 
-            # Print accuracy
-            print('Accuracy for fold %d: %d %%' % (fold, 100.0 * correct / total))
+            print('Multirun average percent error %d: %d %%' % (fold, (multirunavgofavgs/n)))
             print('--------------------------------')
-            results[fold] = 100.0 * (correct / total)
-
-    # Print fold results
+            results[fold] = (multirunavgofavgs/n)
   
     print(f'K-FOLD CROSS VALIDATION RESULTS FOR {k_folds} FOLDS')
     print('--------------------------------')
@@ -403,13 +394,7 @@ if __name__ == "__main__":
     for key, value in results.items():
         print(f'Fold {key}: {value} %')
         sum += value
-    print(f'Average: {sum/len(results.items())} %')
-    
-    # Test model
-    #model.eval()
-    #y_pred = model(X_test)
-    #acc = (y_pred.round() == y_test).float().mean()
-
+    print(f'Multirun average percent error: {sum/len(results.items())} %')
 
 else:
    logging.debug("File imported.")
