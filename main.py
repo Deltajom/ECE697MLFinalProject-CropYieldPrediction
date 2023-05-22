@@ -231,11 +231,23 @@ class CropYieldPredictionModel(nn.Module):
     def __init__(self):
         super().__init__()
         if(useCUDA):
+            # self.zeropad2 = nn.ZeroPad2d((1, 1, 0, 0)).cuda()
+            # self.conv1 = nn.Conv1d(in_channels=1, out_channels=64, kernel_size=3, bias=True).cuda()
+            # self.conv2 = nn.Conv1d(in_channels=64, out_channels=96, kernel_size=3, bias=True).cuda()
+            # self.l1 = nn.Linear(in_features=96*3, out_features=240, bias=True).cuda()
+            # self.l2 = nn.Linear(in_features=240, out_features=120, bias=True).cuda()
+            # self.l3 = nn.Linear(in_features=120, out_features=60, bias=True).cuda()
+            # self.l4 = nn.Linear(in_features=60, out_features=30, bias=True).cuda()
+            # self.l5 = nn.Linear(in_features=30, out_features=1, bias=True).cuda()
             self.zeropad2 = nn.ZeroPad2d((1, 1, 0, 0)).cuda()
-            self.conv1 = nn.Conv1d(in_channels=1, out_channels=8, kernel_size=3, bias=True).cuda() 
-            self.conv2 = nn.Conv1d(in_channels=8, out_channels=16, kernel_size=3, bias=True).cuda()
-            self.l1 = nn.Linear(in_features=16*3, out_features=3, bias=True).cuda()
-            self.l2 = nn.Linear(in_features=3, out_features=1, bias=True).cuda()
+            self.conv1 = nn.Conv1d(in_channels=1, out_channels=16, kernel_size=3, bias=True).cuda()
+            self.conv2 = nn.Conv1d(in_channels=16, out_channels=42, kernel_size=3, bias=True).cuda()
+            self.l1 = nn.Linear(in_features=42*3, out_features=120, bias=True).cuda()
+            self.l2 = nn.Linear(in_features=120, out_features=60, bias=True).cuda()
+            self.l3 = nn.Linear(in_features=60, out_features=30, bias=True).cuda()
+            self.l4 = nn.Linear(in_features=30, out_features=15, bias=True).cuda()
+            self.l5 = nn.Linear(in_features=15, out_features=1, bias=True).cuda() 
+
         else:
             self.zeropad2 = nn.ZeroPad2d((1, 1, 0, 0))
             self.conv1 = nn.Conv1d(in_channels=1, out_channels=60, kernel_size=3, bias=True)
@@ -250,10 +262,15 @@ class CropYieldPredictionModel(nn.Module):
         x = self.zeropad2(torch.nn.functional.relu(self.conv1(x)))
         #print("Layer 2 input" + str(x))
         x = self.zeropad2(torch.nn.functional.relu(self.conv2(x)))
+
+        x = x.view(x.size(0), -1)
         #print("Layer 3 input" + str(x))
         x = torch.nn.functional.relu(self.l1(x))
         #print("Layer 4 input" + str(x))
         x = torch.nn.functional.relu(self.l2(x))
+        x = torch.nn.functional.relu(self.l3(x))
+        x = torch.nn.functional.relu(self.l4(x))
+        x = self.l5(x)
         #print("Layer 5 input" + str(x))
         #x = torch.nn.functional.relu(self.conv5(x))
         #print(x)
@@ -266,14 +283,14 @@ if __name__ == "__main__":
     
     # K-folds cross-validation implimentation referenced from
     # https://github.com/christianversloot/machine-learning-articles/blob/main/how-to-use-k-fold-cross-validation-with-pytorch.md
-    k_folds = 4
-    test_split = 0.15
-    training_epochs = 400
+    k_folds = 6
+    test_split = 0.1
+    training_epochs = 2500
     results = {}
     torch.manual_seed(420) # Might want to comment this, as it will have an effect on k-folds data
     loss_function = RMSELoss()
 
-    DS = LoadDataset1(['Bahamas', 'Bangladesh', 'Brazil','Guatemala','Germany'], "all", ["Maize"])
+    DS = LoadDataset1(['Argentina', 'Colombia', 'Brazil','Chile','El Salvador'], "all", ["Maize"])
     # print(DS.__getitem__(5))
 
     # ----- BEGIN SECTION MIGRATING TO LOADDATASET1 CLASS -----
@@ -319,14 +336,14 @@ if __name__ == "__main__":
         # Batch size = 
         lossarray=[]
         train_subsampler = torch.utils.data.SubsetRandomSampler(train)
-        trainloader = DataLoader(combinationset, batch_size=4, sampler=train_subsampler)
+        trainloader = DataLoader(combinationset, batch_size=8, sampler=train_subsampler)
 
         test_subsampler = torch.utils.data.SubsetRandomSampler(test) 
-        testloader = DataLoader(combinationset, batch_size=4, sampler=test_subsampler)
+        testloader = DataLoader(combinationset, batch_size=8, sampler=test_subsampler)
 
         model = CropYieldPredictionModel()
         model.apply(reset_weights)
-        optimizer = torch.optim.Adam(model.parameters(), lr=1.7e-4)
+        optimizer = torch.optim.Adam(model.parameters(), lr=1.6e-4)
 
         print("Training Model for Fold "+ str(fold))
         logging.debug("Training Model for Fold "+ str(fold))
@@ -348,8 +365,14 @@ if __name__ == "__main__":
                 optimizer.zero_grad()
 
                 outputs = model(inputs)
+                
+                # print("Flattened out" + str(outputs.flatten()))
+
+                # print("Targets" + str(targets))
 
                 loss = loss_function(outputs.flatten(), targets)
+                
+                
 
                 loss.backward()
                 
@@ -365,11 +388,11 @@ if __name__ == "__main__":
         pl.plot(epochs,lossarray,'r')
         pl.ylabel('Loss')
         pl.xlabel('Epoch')
-        pl.title('Loss vs Epoch')
-        pl.show()
+        pl.title('Loss vs Epoch Fold - '+str(fold))
+        pl.savefig(os.path.join(resdir,'Lossgraphfold'+str(fold)+".png"))
         print("Training Model for Fold "+ str(fold)+" completed, saving model.")
         logging.debug("Training Model for Fold "+ str(fold)+" completed, saving model.")
-
+        pl.cla()
         save_path = resdir+"/model-fold-"+str(fold)+".pth"
         torch.save(model.state_dict(), save_path)
         
@@ -377,8 +400,7 @@ if __name__ == "__main__":
         logging.debug("Testing Model for Fold "+ str(fold))
 
         # Evaluation for this fold
-        multirunavgofavgs = 0
-        n=0
+        allelementpercenterrors = []
         with torch.no_grad():
             # Iterate over the test data and generate predictions
             for i, data in enumerate(testloader, 0):
@@ -394,23 +416,27 @@ if __name__ == "__main__":
 
                 # Find average percengate error, where %error = (| Experimental measurements - Actual measurements | / Actual measurements)*100 (element-wise) sum these and 
                 # divide by number of inputs
-                runavgerror = torch.mean(torch.mul(torch.div(torch.abs(torch.sub(outputs.flatten(), targets)), targets),100))
+                runavgerror = torch.mul(torch.div(torch.abs(torch.sub(outputs.flatten(), targets)), targets),100)
+                allelementpercenterrors.extend(runavgerror)
 
-                # Set total and correct
-                multirunavgofavgs += runavgerror
-                n+=1
 
-            print('Multirun average percent error %d: %d %%' % (fold, (multirunavgofavgs/n)))
+            print('Overall average percent error %d: %d %%' % (fold, (torch.sum(torch.tensor(allelementpercenterrors))/len(allelementpercenterrors))))
             print('--------------------------------')
-            results[fold] = (multirunavgofavgs/n)
-  
+            logging.debug('Overall average percent error %d: %d %%' % (fold, (torch.sum(torch.tensor(allelementpercenterrors))/len(allelementpercenterrors))))
+            logging.debug('--------------------------------')
+            results[fold] = (torch.sum(torch.tensor(allelementpercenterrors))/len(allelementpercenterrors))
+   
     print(f'K-FOLD CROSS VALIDATION RESULTS FOR {k_folds} FOLDS')
     print('--------------------------------')
+
+    logging.debug(f'K-FOLD CROSS VALIDATION RESULTS FOR {k_folds} FOLDS')
+    logging.debug('--------------------------------')
     sum = 0.0
     for key, value in results.items():
         print(f'Fold {key}: {value} %')
         sum += value
     print(f'Multirun average percent error: {sum/len(results.items())} %')
+    logging.debug(f'Multirun average percent error: {sum/len(results.items())} %')
 
 else:
    logging.debug("File imported.")
