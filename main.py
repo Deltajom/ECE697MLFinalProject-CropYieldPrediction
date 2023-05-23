@@ -231,14 +231,6 @@ class CropYieldPredictionModel(nn.Module):
     def __init__(self):
         super().__init__()
         if(useCUDA):
-            # self.zeropad2 = nn.ZeroPad2d((1, 1, 0, 0)).cuda()
-            # self.conv1 = nn.Conv1d(in_channels=1, out_channels=64, kernel_size=3, bias=True).cuda()
-            # self.conv2 = nn.Conv1d(in_channels=64, out_channels=96, kernel_size=3, bias=True).cuda()
-            # self.l1 = nn.Linear(in_features=96*3, out_features=240, bias=True).cuda()
-            # self.l2 = nn.Linear(in_features=240, out_features=120, bias=True).cuda()
-            # self.l3 = nn.Linear(in_features=120, out_features=60, bias=True).cuda()
-            # self.l4 = nn.Linear(in_features=60, out_features=30, bias=True).cuda()
-            # self.l5 = nn.Linear(in_features=30, out_features=1, bias=True).cuda()
             self.zeropad2 = nn.ZeroPad2d((1, 1, 0, 0)).cuda()
             self.conv1 = nn.Conv1d(in_channels=1, out_channels=16, kernel_size=3, bias=True).cuda()
             self.conv2 = nn.Conv1d(in_channels=16, out_channels=42, kernel_size=3, bias=True).cuda()
@@ -290,6 +282,7 @@ if __name__ == "__main__":
     torch.manual_seed(420) # Might want to comment this, as it will have an effect on k-folds data
     loss_function = RMSELoss()
 
+    # Possbile idea, Test against Peru? Same region of world prediction based off of nearby countries
     DS = LoadDataset1(['Argentina', 'Colombia', 'Brazil','Chile','El Salvador'], "all", ["Maize"])
     # print(DS.__getitem__(5))
 
@@ -386,6 +379,7 @@ if __name__ == "__main__":
             lossarray.append(current_loss)
         epochs=np.arange(0,len(lossarray))
         pl.plot(epochs,lossarray,'r')
+        pl.plot(np.unique(epochs), np.poly1d(np.polyfit(epochs, lossarray, 3))(np.unique(epochs)), 'b')
         pl.ylabel('Loss')
         pl.xlabel('Epoch')
         pl.title('Loss vs Epoch Fold - '+str(fold))
